@@ -2,29 +2,51 @@
 # based off HexRaysCodeXplorer makefile for Linux
 #
 # Instructions:
-# After setting up IDA SDK and Hex Rays SDK to work, in the HexRaysDeob folder do:
-# for ida64.app
-# 	EA64=1 make [install] -f makefile.mac
-# for ida.app
-# 	EA64=0 make [install] -f makefile.mac
+# download IDA SDK
+# set var env IDA_SDK to the path of the SDK
+# set var env IDA_DIR to the path of IDA directory
+# set var env __ARM__ to 1 if running under Apple Silicon ARM
+# set var env __MAC__ to 1 if running under macOS
+# set var env IDAUSR to IDA plugin directory
 #
+# After setting up IDA SDK and Hex Rays SDK to work, in the HexRaysDeob folder
+# do:
+#
+EXT=dylib
+TARGET_EXEC := HexRaysDeob.$(EXT)
+# Program for compiling C++ programs; default g++
+# CFLAGS: Extra flags to give to the C compiler
+# CXXFLAGS: Extra flags to give to the C++ compiler
+CCXX=g++
+CXXFLAGS += -D_GLIBCXX_USE_CXX11_ABI=0
+CXXFLAGS += -D__ARM__
+CXXFLAGS += -D__EA64__
+CXXFLAGS += -D__MAC__
+CXXFLAGS += -D__PLUGIN__
+CXXFLAGS += -Wno-logical-op-parentheses
+CXXFLAGS += -Wno-nullability-completeness
+# detect potential issues with the use of va_start and other variable argument
+# functions in C programs.
+CXXFLAGS += -Wno-varargs
+CXXFLAGS += -fPIC
+CXXFLAGS += -m64
+CXXFLAGS += -std=c++14
+CXXFLAGS += -Wfree-nonheap-object
+CXXFLAGS += -Wmismatched-new-delete
+# Filtering out the warning: format specifies type 'double' but the argument
+# has type 'ea_t' (aka 'unsigned long long')
+CXXFLAGS += -Wno-format
 
-# CHANGE ME :-)
-# where IDA_DIR must be the full path to ida.app (not ida64.app)
-# IDA 7.5 example: /Applications/IDA Pro 7.5/ida.app/
-IDA_DIR="/Applications/IDA Pro 7.5/ida.app/"
-# path to IDA SDK folder
-IDA_SDK="/Applications/IDA Pro 7.5/idasdk75"
-
-CC=g++
 LD=ld
-LDFLAGS=-shared -m64
+# LDFLAGS: Extra flags to give to compilers when they are supposed to invoke the linker
+LDFLAGS += -shared
+LDFLAGS += -m64
 
-LIBDIR=-L$(IDA_DIR)/Contents/MacOS
-SRCDIR=./
-HEXRAYS_SDK=$(IDA_DIR)/plugins/hexrays_sdk
-INCLUDES=-I$(IDA_SDK)/include -I$(HEXRAYS_SDK)/include
-__X64__=1
+LIBDIR=-L$(IDA_SDK)/lib/arm64_mac_clang_64_pro
+SRCDIR=./src/
+INCLUDES=-I$(IDA_SDK)/include
+# No need as we should use ida64
+# EA64=1
 
 SRC=$(SRCDIR)main.cpp \
 	$(SRCDIR)AllocaFixer.cpp \
@@ -38,33 +60,24 @@ SRC=$(SRCDIR)main.cpp \
 	$(SRCDIR)Unflattener.cpp
 	
 OBJS=$(subst .cpp,.o,$(SRC))
+LIBS += -lc
+LIBS += -ldl
+LIBS += -lida64
+LIBS += -lpthread
 
-CFLAGS=-m64 -fPIC -D__MAC__ -D__PLUGIN__ -std=c++14 -D__X64__ -D_GLIBCXX_USE_CXX11_ABI=0 -Wno-logical-op-parentheses -Wno-nullability-completeness
-LIBS=-lc -lpthread -ldl
-EXT=dylib
+all: check-env clean HexRaysDeob.$(EXT)
 
-ifeq ($(EA64),1)
-	CFLAGS+=-D__EA64__
-	LIBS+=-lida64
-	SUFFIX=64
-else
-	LIBS+=-lida
-	SUFFIX=
-endif
-
-all: check-env clean HexRaysDeob$(SUFFIX).$(EXT)
-
-HexRaysDeob$(SUFFIX).$(EXT): $(OBJS) 
-	$(CC) $(LDFLAGS) $(LIBDIR) -o HexRaysDeob$(SUFFIX).$(EXT) $(OBJS) $(LIBS)
+HexRaysDeob.$(EXT): $(OBJS)
+	$(CCXX) $(LDFLAGS) $(LIBDIR) -o HexRaysDeob.$(EXT) $(OBJS) $(LIBS)
 
 %.o: %.cpp
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+	$(CCXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
 
 clean:
-	rm -f $(OBJS) HexRaysDeob$(SUFFIX).$(EXT)
+	rm -f $(OBJS) HexRaysDeob.$(EXT)
 
-install: HexRaysDeob$(SUFFIX).$(EXT)
-	cp -f HexRaysDeob$(SUFFIX).$(EXT) $(IDA_DIR)/Contents/MacOS/plugins
+install: HexRaysDeob.$(EXT)
+	cp -vf HexRaysDeob.$(EXT) $(IDAUSR)/plugins
 
 check-env:
 ifndef IDA_SDK
@@ -73,7 +86,13 @@ endif
 ifndef IDA_DIR
 	$(error IDA_DIR is undefined)
 endif
-ifndef EA64
-	$(error specify EA64=0 for 32 bit build or EA64=1 for 64 bit build)
+ifndef __ARM__
+	$(error __ARM__ is undefined)
+endif
+ifndef __MAC__
+	$(error __MAC__ is undefined)
+endif
+ifndef IDAUSR
+	$(error IDAUSR is undefined)
 endif
 .PHONY: check-env
