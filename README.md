@@ -11,7 +11,7 @@ Reference: [https://www.hex-rays.com/blog/hex-rays-microcode-api-vs-obfuscating-
 
 * After enable/disable press F5 again in the pseuco code view to refresh
 
-This uses the new C++ plugin API so it's only >= IDA 7.5 compatible
+This uses the new C++ plugin API so it's only >= IDA 8.4 compatible
 
 Based on IDA SDK ht_view sample plugin
 
@@ -31,14 +31,8 @@ Edit the `Makefile` and fix the IDA paths if necessary.
 
 To compile and install 64 bit version:
 ```
-EA=1 make
-EA=1 make install
-```
-
-To compile and install 32 bit version:
-```
-EA=0 make
-EA=0 make install
+IDA_SDK=<path_to_IDA_SDK> IDA_DIR=<path_to_IDA_directory> __ARM__=1 __MAC__=1 IDAUSR=~/.idapro/plugins make
+IDA_SDK=<path_to_IDA_SDK> IDA_DIR=<path_to_IDA_directory> __ARM__=1 __MAC__=1 IDAUSR=~/.idapro/plugins make install
 ```
 
 # Linux build
